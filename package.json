@@ -1,0 +1,1 @@
+{"description":"Minimal reverse proxy forwarding all requests to a Supabase project, so clients without VPN access can reach it.","engines":{"node":">=18"},"main":"server.js","name":"supabase-proxy","scripts":{"start":"node server.js"},"version":"1.0.0"}
