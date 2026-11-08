@@ -1,5 +1,5 @@
 // Minimal reverse proxy: forwards every request to the Supabase project.
-// No dependencies, Node 18+ (uses global fetch). Deployed on Zeabur free tier.
+// No dependencies, Node 18+ (uses global fetch). Deployed on Render free tier.
 // The app points SUPABASE_URL at this proxy instead of *.supabase.co,
 // so phones without a VPN can reach Supabase. Auth/RLS still enforced by
 // Supabase itself; this proxy adds no auth and stores nothing.
@@ -17,6 +17,12 @@ const HOP = new Set([
   'proxy-authenticate',
   'upgrade',
 ]);
+
+// 响应头里必须剥掉的：fetch 拿到的是已解压的 body（undici 会自动解 gzip），
+// 再原样转发上游的 content-encoding: gzip，客户端就会拿明文 JSON 当 gzip 解，
+// Dart 直接报 FormatException: Filter error, bad data（2026-11-08 V7 实测）。
+// content-length 也剥掉，让 Node 按实际 buf 长度重算。
+const STRIP_RES = new Set([...HOP, 'content-encoding', 'content-length']);
 
 const server = http.createServer((req, res) => {
   if (req.url === '/' || req.url === '/health') {
@@ -54,7 +60,7 @@ const server = http.createServer((req, res) => {
       });
       const outHeaders = {};
       upstream.headers.forEach((v, k) => {
-        if (!HOP.has(k.toLowerCase())) outHeaders[k] = v;
+        if (!STRIP_RES.has(k.toLowerCase())) outHeaders[k] = v;
       });
       outHeaders['access-control-allow-origin'] = '*';
       const buf = Buffer.from(await upstream.arrayBuffer());
